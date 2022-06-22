@@ -1,0 +1,802 @@
+---
+title: "TFG"
+author: "Alvaro Ruiz"
+date: "16 de marzo de 2022"
+output: html_document
+---
+
+#Paquetes y carga de datos
+```{r}
+library(readxl)
+library(foreign)
+library(sjmisc)
+library(PerformanceAnalytics)
+library(psych)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(visreg)
+library(GGally)
+library(mapSpain)
+library(corrplot)
+library(rgdal)
+library(broom)
+library(car)
+library(ggcorrplot)
+library(caret)
+library(tree)
+```
+
+```{r}
+Datos <- read_excel("DatosEne22.xlsx")
+```
+
+#An??lisis COVID-19
+```{r}
+ggplot(Datos, aes(x = EDAD)) +
+  geom_histogram()
+
+hist1 <- ggplot(Datos, aes(x=EDAD)) + geom_histogram() + 
+  xlab("Edad (0-100)") + 
+  ylab("Frecuencia Absoluta") +
+  ggtitle("Distribucion de edad")
+```
+
+```{r}
+attach(Datos)
+```
+
+#Preocupaci??n COVID-19
+```{r}
+pl <- ggplot(Datos, aes(x=PREOC_COVID))
+```
+
+```{r}
+P12<-pl + geom_histogram(binwidth = 1, col='black', fill='cadetblue4')
+P12 + xlab('Puntuacion') + ylab('Count') + ggtitle('Grado de preocupacion ante la situacion del coronavirus')
+```
+
+```{r}
+count(Datos, PREOC_COVID)
+```
+
+```{r}
+count(Datos, VALORACION_COVID)
+```
+
+```{r}
+FILTRO_PREOC2<-filter(Datos, PREOC_COVID!=8)
+FILTRO_PREOC1<-filter(FILTRO_PREOC2, PREOC_COVID!=9)
+mod_edad_preoc<-lm(EDAD ~ PREOC_COVID, data = FILTRO_PREOC1)
+ggplot(data = FILTRO_PREOC1, aes(x = EDAD, y = PREOC_COVID)) +
+geom_point() +
+geom_smooth(color = "firebrick") +
+geom_hline(yintercept = 0) +
+theme_bw()
+```
+
+#Valoraci??n COVID-19
+```{r}
+FILTRO_VALORACION<-filter(Datos, VALORACION_COVID<4)
+```
+
+```{r}
+mod_edad_VALORA<-lm(EDAD ~ VALORACION_COVID, data = FILTRO_VALORACION)
+ggplot(data = FILTRO_VALORACION, aes(x = EDAD, y = VALORACION_COVID)) +
+geom_point() +
+geom_smooth(color = "firebrick") +
+geom_hline(yintercept = 0) +
+theme_bw()
+```
+
+```{r}
+FILTRO_PREOC<-filter(Datos, PREOC_COVID<6)
+
+ggplot(data = FILTRO_PREOC, aes(x = EDAD, y = PREOC_COVID)) +
+geom_point() +
+geom_smooth(color = "firebrick") +
+geom_hline(yintercept = 0) +
+theme_bw()
+```
+
+#Infecci??n COVID-19
+```{r}
+FILTRO_INFECC<-filter(FILTRO_PREOC, INFECC_COVID<3)
+
+INFECCION_COVID=factor(FILTRO_INFECC$INFECC_COVID, labels = c("SI", "NO"))
+tabla_inf_preoc<-table(FILTRO_INFECC$PREOC_COVID, INFECCION_COVID)
+tabla1<-prop.table(tabla_inf_preoc,1)
+round(prop.table(tabla_inf_preoc,1),3)
+```
+
+```{r}
+lminfec<-lm(PREOC_COVID~INFECCION_COVID, data=FILTRO_INFECC)
+visreg(lminfec, partial=T)
+```
+
+```{r}
+chisq.test(tabla1)
+```
+
+```{r}
+chisq.test(tabla1)$expected
+```
+
+#Vacuna y dosis
+```{r}
+FILTRO_VACUNA<-filter(FILTRO_PREOC, VACUNA<3)
+
+lm_vacuna<-lm(PREOC_COVID~VACUNA, data=FILTRO_VACUNA)
+visreg(lm_vacuna, partial=T)
+```
+
+```{r}
+FILTRO_PREOC_1<-filter(Datos, PREOC_COVID<6)
+FILTRO_DOSIS<-filter(FILTRO_PREOC_1, DOSIS<4)
+```
+
+```{r}
+tabla_dosis_preoc<-table(FILTRO_DOSIS$PREOC_COVID, FILTRO_DOSIS$DOSIS)
+tabla2<-prop.table(tabla_dosis_preoc,1)
+round(tabla2,3)
+```
+
+```{r}
+mosaicplot(tabla2, color = T, main = "Grafico DOSIS / PREOC_COVID")
+```
+
+```{r}
+INFECC_COVIDN<-as.numeric(INFECC_COVID)
+DOSISN<-as.numeric(DOSIS)
+Datos_CCAA<-data.frame(CCAA, PREOC_COVID, VALORACION_COVID, DOSISN, INFECC_COVIDN)
+FILTRO1<-filter(Datos_CCAA, INFECC_COVIDN<3)
+FILTRO2<-filter(FILTRO1, DOSISN<4)
+FILTRO3<-filter(FILTRO2, VALORACION_COVID<4)
+CCAA_Buenos<-filter(FILTRO3, PREOC_COVID<6)
+
+summary(CCAA_Buenos)
+```
+
+#Mapas Espa??a COVID-19
+```{r}
+(Media_Preoc<-aggregate(PREOC_COVID~CCAA, FUN=mean))
+```
+
+```{r}
+plot(Media_Preoc, pch=19)
+axis(1, at=c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19))
+```
+
+```{r}
+filter(Media_Preoc, PREOC_COVID<1.851)
+```
+
+```{r}
+PREOC_COVID_CCAA<-c(1.764706,2.068093,2.054131,2.160920,1.945338,2.000000,1.800000,2.400000,1.830986,1.729167,1.934783,1.834320,1.910112,2.129870,1.778947,1.922449,1.947917,1.907285,1.949367)
+nuts1 <- esp_get_nuts(resolution = 10, epsg = 3857, nuts_level = 2)
+nuts1=cbind(nuts1, PREOC_COVID_CCAA)
+ggplot(nuts1, aes(fill=PREOC_COVID_CCAA)) +
+  geom_sf() +
+  theme_linedraw() +
+  labs(title = "MAPA POR COMUNIDADES")
+```
+
+```{r}
+(Media_Dosis<-aggregate(DOSISN~CCAA, FUN=mean))
+```
+
+```{r}
+plot(Media_Dosis, pch=19)
+axis(1, at=c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19))
+```
+
+```{r}
+(Media_infecc<-aggregate(INFECC_COVIDN~CCAA, FUN=mean))
+
+```
+
+```{r}
+plot(Media_infecc, pch=19)
+axis(1, at=c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19))
+```
+
+```{r}
+INFECC_COVIDN_CCAA<-c(1.380952, 1.518325,1.783019,1.640000,1.523256,1.702703,2,1,1.666667,1.714286,1.6,1.640625,1.5,1.521739,1.580645,1.47027,1.526316,1.675,1.694444)
+nuts2 <- esp_get_nuts(resolution = 10, epsg = 3857, nuts_level = 2)
+nuts2=cbind(nuts2, INFECC_COVIDN_CCAA)
+ggplot(nuts2, aes(fill=INFECC_COVIDN_CCAA)) +
+  geom_sf() +
+  theme_linedraw() +
+  labs(title = "MAPA POR COMUNIDADES")
+```
+
+#AN??LISIS SOCIAL Y POL??TICO
+#Limpieza de datos
+```{r}
+VALORA_PS<-filter(Datos, VALORALIDERES_PS!=98)
+VALORA_PS1<-filter(VALORA_PS, VALORALIDERES_PS!=99)
+VALORA_PS2<-filter(VALORA_PS1, VALORALIDERES_PS!='NA')
+
+VALORA_PC<-filter(VALORA_PS2, VALORALIDERES_PC!=98)
+VALORA_PC1<-filter(VALORA_PC, VALORALIDERES_PC!=99)
+VALORA_PC2<-filter(VALORA_PC1, VALORALIDERES_PC!='NA')
+
+VALORA_YD<-filter(VALORA_PC2, VALORALIDERES_YD!=98)
+VALORA_YD1<-filter(VALORA_YD, VALORALIDERES_YD!=99)
+VALORA_YD2<-filter(VALORA_YD1, VALORALIDERES_YD!='NA')
+
+VALORA_SA<-filter(VALORA_YD2, VALORALIDERES_SA!=98)
+VALORA_SA1<-filter(VALORA_SA, VALORALIDERES_SA!=99)
+VALORA_SA2<-filter(VALORA_SA1, VALORALIDERES_SA!='NA')
+
+VALORA_IA<-filter(VALORA_SA2, VALORALIDERES_IA!=98)
+VALORA_IA1<-filter(VALORA_IA, VALORALIDERES_IA!=99)
+VALORA_IA2<-filter(VALORA_IA1, VALORALIDERES_IA!='NA')
+
+VALORA_IE<-filter(VALORA_IA2, VALORALIDERES_IE!=98)
+VALORA_IE1<-filter(VALORA_IE, VALORALIDERES_IE!=99)
+VALORACION<-filter(VALORA_IE1, VALORALIDERES_IE!='NA')
+```
+
+```{r}
+attach(VALORACION)
+```
+
+```{r}
+FILTRO_ECOES<-filter(VALORACION, ECOESP!=8)
+FILTRO_ECOESP<-filter(FILTRO_ECOES, ECOESP!=9)
+FILTRO_ECOPE<-filter(FILTRO_ECOESP, ECOPER!=8)
+FILTRO_ECOPER<-filter(FILTRO_ECOPE, ECOPER!=9)
+```
+
+```{r}
+Tabla4<-table(FILTRO_ECOPER$VALORALIDERES_PS, FILTRO_ECOPER$ECOESP)
+TABLA_PS_ECOESP<-prop.table(Tabla4,2)
+round(TABLA_PS_ECOESP,3)
+```
+
+
+```{r}
+library(car)
+library(dplyr)
+ECO_ESP_R<-car::recode(FILTRO_ECOPER$ECOESP, '1:3=1; 4=0; 5=0')
+barplot(table(ECO_ESP_R), cex.names = .6, cex.axis = .7)
+```
+
+#Pedro S??nchez - Econom??a personal
+
+```{r}
+FILTRO_ECOPER$VALORALIDERES_PS<-as.numeric(FILTRO_ECOPER$VALORALIDERES_PS)
+modelo_ps_ecoesp<-glm(ECO_ESP_R ~ VALORALIDERES_PS, data = FILTRO_ECOPER, family = binomial)
+summary(modelo_ps_ecoesp)
+```
+
+#Pablo Casado - confianza oposicion
+```{r}
+FILTRO_CONFIANZA_OP<-filter(VALORACION, VALORACION$CONFIANZAOPOSIC!=8)
+FILTRO_CONF_OP<-filter(FILTRO_CONFIANZA_OP, FILTRO_CONFIANZA_OP$CONFIANZAOPOSIC!=9)
+```
+
+```{r}
+CONFIANZAOPOSIC<-car::recode(FILTRO_CONF_OP$CONFIANZAOPOSIC, "1=4; 2=3; 3=2; 4=1")
+tabopval<-table(FILTRO_CONF_OP$VALORALIDERES_PC, CONFIANZAOPOSIC)
+(TABLA_PC_CONFOP<-round(prop.table(tabopval,1),3))
+```
+
+```{r}
+attach(FILTRO_CONF_OP)
+```
+
+```{r}
+VALORALIDERES_PC<-as.numeric(VALORALIDERES_PC)
+CONFIANZAOPOSIC<-as.numeric(CONFIANZAOPOSIC)
+```
+
+```{r}
+cor.test(VALORALIDERES_PC, CONFIANZAOPOSIC)
+```
+
+```{r}
+shapiro.test(CONFIANZAOPOSIC)
+```
+
+```{r}
+shapiro.test(VALORALIDERES_PC)
+```
+
+
+
+```{r}
+cor.test(VALORALIDERES_PC, CONFIANZAOPOSIC, method= "spearman")
+```
+
+#Yolanda D??az - Confianza presidente
+```{r}
+FILTRO_CONFIANZA_PTE<-filter(VALORACION, VALORACION$CONFIANZAPTE!=8)
+FILTRO_CONF_PTE<-filter(FILTRO_CONFIANZA_PTE, FILTRO_CONFIANZA_PTE$CONFIANZAPTE!=9)
+```
+
+```{r}
+CONFIANZAPTE<-car::recode(FILTRO_CONF_PTE$CONFIANZAPTE, "1=4; 2=3; 3=2; 4=1")
+tabPTEvalYD<-table(FILTRO_CONF_PTE$VALORALIDERES_YD, CONFIANZAPTE)
+(TABLA_YD_CONF_PTE<-round(prop.table(tabPTEvalYD,1),3))
+```
+
+```{r}
+attach(FILTRO_CONF_PTE)
+```
+
+
+```{r}
+VALORALIDERES_YD<-as.numeric(VALORALIDERES_YD)
+CONFIANZAPTE<-as.numeric(CONFIANZAPTE)
+```
+
+```{r}
+cor.test(VALORALIDERES_YD, CONFIANZAPTE)
+```
+
+```{r}
+shapiro.test(CONFIANZAPTE)
+```
+
+```{r}
+shapiro.test(VALORALIDERES_YD)
+```
+
+```{r}
+cor.test(VALORALIDERES_YD, CONFIANZAPTE, method= "spearman")
+```
+
+#Santiago Abascal - Clase
+```{r}
+FILTRO_C<-filter(VALORACION, CLASE!=6)
+FILTRO_CL<-filter(FILTRO_C, CLASE!=8)
+FILTRO_CLASE<-filter(FILTRO_CL, CLASE!=9)
+
+tabSAclas<-table(FILTRO_CLASE$VALORALIDERES_SA, FILTRO_CLASE$CLASE)
+TABLA_SA_CLASE<-round(prop.table(tabSAclas,2),3)
+TABLA_SA_CLASE
+```
+
+```{r}
+FILTRO_CLASE$CLASE<-as.factor(FILTRO_CLASE$CLASE)
+FILTRO_CLASE$VALORALIDERES_SA<-as.numeric(FILTRO_CLASE$VALORALIDERES_SA)
+```
+
+
+
+```{r}
+BOX_VAL_SA_CLASE<-ggplot(FILTRO_CLASE, aes(x=CLASE, y=VALORALIDERES_SA)) +
+  geom_boxplot() +
+  ggtitle("Valoraci??n a Santiago Abascal seg??n clase") 
+BOX_VAL_SA_CLASE
+```
+
+```{r}
+library(Rmisc)
+```
+
+```{r}
+DATAFRAMESACLASE<-data.frame(FILTRO_CLASE$VALORALIDERES_SA, FILTRO_CLASE$CLASE)
+```
+
+```{r}
+(TABLA_SA_CLASE_SUMMARYSE<-summarySE(DATAFRAMESACLASE, measurevar = "FILTRO_CLASE.VALORALIDERES_SA", groupvars = "FILTRO_CLASE.CLASE", na.rm=T))
+```
+
+```{r}
+BOX_IC_SA_CLASE<-ggplot(TABLA_SA_CLASE_SUMMARYSE, aes(x=FILTRO_CLASE.CLASE, y=FILTRO_CLASE.VALORALIDERES_SA)) +
+  geom_point() + ylim(0,10) +
+  geom_errorbar(aes(ymin=FILTRO_CLASE.VALORALIDERES_SA-ci, ymax=FILTRO_CLASE.VALORALIDERES_SA+ci), width=.3) +
+  ggtitle("Intervalo para la valoracion segun clase")
+BOX_IC_SA_CLASE
+```
+
+#In??s Arrimadas - CCAA
+```{r}
+VALORACION$CCAA<-as.factor(VALORACION$CCAA)
+VALORACION$VALORALIDERES_IA<-as.numeric(VALORACION$VALORALIDERES_IA)
+DATAFRAME_IA_CCAA<-data.frame(VALORACION$VALORALIDERES_IA, VALORACION$CCAA)
+
+DATAFRAME_IA_CCAA$VALORACION.CCAA<-car::recode(DATAFRAME_IA_CCAA$VALORACION.CCAA,' "1" = "Andalucia" ; "2"="Arag??n"; "3"="Asturias"; "4"="Baleares"; "5"="Canarias"; "6"="Cantabria"; "7"="Castilla-La Mancha"; "8"="Castilla y Le??n"; "9"="Catalu??a"; "10"="Comunidad Valenciana"; "11"="Extremadura"; "12"="Galicia"; "13"="Comunidad de Madrid"; "14"="Regi??n de Murcia"; "15"="Navarra"; "16"="Pa??s Vasco"; "17"="La Rioja"; "18"="Ceuta"; "19"="Melilla" ')
+
+TABLA_IA_CCAA<-summarySE(DATAFRAME_IA_CCAA, measurevar = "VALORACION.VALORALIDERES_IA", groupvars = "VALORACION.CCAA", na.rm = T)
+
+BARRA_ERROR_IA_CCAA <- ggplot(TABLA_IA_CCAA, aes(x=reorder(VALORACION.CCAA, VALORACION.VALORALIDERES_IA), y=VALORACION.VALORALIDERES_IA)) + geom_point() + 
+  geom_errorbar(aes(ymin=VALORACION.VALORALIDERES_IA-ci, ymax=VALORACION.VALORALIDERES_IA+ci), width=0.2) + 
+  ylab("Valoracion media") + xlab("") +
+  ggtitle("Valoracion media por CCAA hacia Ines Arrimadas") +
+  coord_flip()
+BARRA_ERROR_IA_CCAA
+```
+
+#I??igo Errej??n - Edad
+```{r}
+VALORACION$EDAD<-as.numeric(VALORACION$EDAD)
+VALORACION$VALORALIDERES_IE<-as.numeric(VALORACION$VALORALIDERES_IE)
+DATAFRAME_IE_EDAD<-data.frame(VALORACION$VALORALIDERES_IE, VALORACION$EDAD)
+
+
+DATAFRAME_IE_EDAD$VALORACION.EDAD<-car::recode(DATAFRAME_IE_EDAD$VALORACION.EDAD, ' 18:24 = "18-24" ; 25:34 = "25-34" ; 35:44 = "35-44" ; 45:54 = "45-54" ; 55:64 = "55-64" ; 65:98 = "65-98"  ')
+
+TABLA_IE_EDAD<-summarySE(DATAFRAME_IE_EDAD, measurevar = "VALORACION.VALORALIDERES_IE", groupvars = "VALORACION.EDAD", na.rm = T)
+
+GRAF_IE_EDAD <- ggplot(TABLA_IE_EDAD, aes(x=reorder(VALORACION.EDAD, VALORACION.VALORALIDERES_IE), y=VALORACION.VALORALIDERES_IE)) + 
+  geom_bar(stat="identity", fill="grey") + ylim(0, 10) + 
+  geom_errorbar(aes(ymin=VALORACION.VALORALIDERES_IE-ci, ymax=VALORACION.VALORALIDERES_IE+ci), width=0.3) +
+  xlab("") + ylab("Valoraci??n media") + 
+  ggtitle("         Valoraci??n media de cada grupo de
+          edad con respecto a I??igo Errej??n") + 
+  coord_flip()
+GRAF_IE_EDAD
+```
+
+#Correlaci??n entre valoraciones
+```{r}
+VALORACIONES<-data.frame(VALORACION$VALORALIDERES_PS, VALORACION$VALORALIDERES_PC, VALORACION$VALORALIDERES_YD, VALORACION$VALORALIDERES_SA, VALORACION$VALORALIDERES_IA, VALORACION$VALORALIDERES_IE)
+
+VALORACIONES$VALORACION.VALORALIDERES_PS<-as.numeric(VALORACIONES$VALORACION.VALORALIDERES_PS)
+VALORACIONES$VALORACION.VALORALIDERES_PC<-as.numeric(VALORACIONES$VALORACION.VALORALIDERES_PC)
+VALORACIONES$VALORACION.VALORALIDERES_YD<-as.numeric(VALORACIONES$VALORACION.VALORALIDERES_YD)
+VALORACIONES$VALORACION.VALORALIDERES_SA<-as.numeric(VALORACIONES$VALORACION.VALORALIDERES_SA)
+VALORACIONES$VALORACION.VALORALIDERES_IA<-as.numeric(VALORACIONES$VALORACION.VALORALIDERES_IA)
+VALORACIONES$VALORACION.VALORALIDERES_IE<-as.numeric(VALORACIONES$VALORACION.VALORALIDERES_IE)
+
+corr<-round(cor(VALORACIONES[,0:6]),1)
+
+ggcorrplot(corr, hc.order = T, type = "lower",
+           outline.col = "black",
+           ggtheme = ggplot2::theme_gray,
+           colors = c("brown4", "white", "royalblue3"),
+           lab = T)
+```
+
+#Intenci??n voto, gr??fico parlamento
+```{r}
+count(Datos$INTENCIONVOTO)
+```
+
+```{r}
+library(ggparliament)
+```
+
+```{r}
+Intencion<-read_excel("Intencion.xlsx")
+```
+
+```{r}
+Parlamento_intencion<-parliament_data(election_data = Intencion,
+                                      type = "semicircle",
+                                      parl_rows = 9,
+                                      party_seats = Intencion$REPRESENTACION)
+
+ggplot(Parlamento_intencion, aes(x=x, y=y, colour = SIGLAS_PARTIDO)) +
+  geom_parliament_seats() +
+  draw_partylabels(type = "semicircle",
+                   party_names = SIGLAS_PARTIDO,
+                   party_seats = REPRESENTACION,
+                   party_colours = COLOR) +
+  draw_totalseats(n=350, type = "semicircle") +
+  draw_majoritythreshold(n=176, label = T, type = "semicircle") +
+  theme_ggparliament() +
+  labs(title = "Estimacion enero 2022") +
+  scale_colour_manual(values = Parlamento_intencion$COLOR,
+                      limits = Parlamento_intencion$SIGLAS_PARTIDO)
+```
+
+#Valoracion media lideres politicos
+```{r}
+VALORACION_MEDIA<-data.frame(VALORACION$VALORALIDERES_PS, VALORACION$VALORALIDERES_PC, VALORACION$VALORALIDERES_YD, VALORACION$VALORALIDERES_SA, VALORACION$VALORALIDERES_IA)
+
+VALORACION_MEDIA$VALORACION.VALORALIDERES_PS<-as.numeric(VALORACION_MEDIA$VALORACION.VALORALIDERES_PS)
+
+VALORACION_MEDIA$VALORACION.VALORALIDERES_PC<-as.numeric(VALORACION_MEDIA$VALORACION.VALORALIDERES_PC)
+
+VALORACION_MEDIA$VALORACION.VALORALIDERES_YD<-as.numeric(VALORACION_MEDIA$VALORACION.VALORALIDERES_YD)
+
+VALORACION_MEDIA$VALORACION.VALORALIDERES_SA<-as.numeric(VALORACION_MEDIA$VALORACION.VALORALIDERES_SA)
+
+summary(VALORACION_MEDIA)
+```
+
+#Intenci??n voto por provincias
+```{r}
+DATOS1<-filter(Datos, Datos$INTENCIONVOTO!=95)
+DATOS2<-filter(DATOS1, DATOS1$INTENCIONVOTO!=96)
+DATOS3<-filter(DATOS2, DATOS2$INTENCIONVOTO!=77)
+DATOS4<-filter(DATOS3, DATOS3$INTENCIONVOTO!=97)
+DATOS5<-filter(DATOS4, DATOS4$INTENCIONVOTO!=98)
+DATOS6<-filter(DATOS5, DATOS5$INTENCIONVOTO!=99)
+
+
+DATAFRAME<-data.frame(DATOS6$PROV, DATOS6$INTENCIONVOTO)
+DATAFRAME$DATOS6.INTENCIONVOTO<-as.numeric(DATAFRAME$DATOS6.INTENCIONVOTO)
+```
+
+```{r}
+Moda_prov<-tapply(DATOS6$INTENCIONVOTO, DATOS6$PROV, mode)
+```
+
+```{r}
+PARTIDO_PROV<-c('PSOE','PP','PSOE','PSOE','PSOE','PP','PSOE','PNV','PSOE','PSOE','PSOE','PSOE','PP','PSOE','PSOE','PSOE','PP','PSOE','PSOE','PSOE','PSOE','PSOE','PSOE','PSOE','VOX','PSOE','PP','PSOE','PSOE','PSOE','PSOE','PSOE','PSOE','PSOE','PSOE','PP','PP','PSOE','PSOE','PSOE','PSOE','VOX','PP','PSOE','PP','PSOE','PP','PSOE','PSOE','PP','PSOE','PP','PSOE','PSOE','PSOE','PSOE','PSOE','PSOE','PSOE')
+```
+
+```{r}
+nuts2 <- esp_get_nuts(resolution = 10, epsg = 3857, nuts_level = 3)
+nuts2=cbind(nuts2, PARTIDO_PROV)
+ggplot(nuts2, aes(fill=PARTIDO_PROV)) +
+  geom_sf() +
+  theme_linedraw() +
+  labs(title = "PARTIDO MAS VOTADO POR PROVINCIAS - INTENCION ENERO'22") +
+  theme_minimal() +
+  scale_fill_manual(values = c("palegreen4","dodgerblue","firebrick2", "chartreuse2"))
+```
+
+
+#ARBOL DECISI??N VS RANDOM FOREST
+```{r}
+library(rpart)
+library(randomForest)
+```
+
+```{r}
+DatosAD<-data.frame(ESCALA_IDEOLOG, ECOPER, ESTUDIOS, POB_ACTIVA_INACT, CLASE)
+str(DatosAD)
+```
+
+#Limpiamos Datos
+```{r}
+DatosAD1<-filter(DatosAD, DatosAD$ESCALA_IDEOLOG!=99)
+DatosAD2<-filter(DatosAD1, DatosAD1$ESCALA_IDEOLOG!=98)
+DatosAD3<-filter(DatosAD2, DatosAD2$ECOPER!=9)
+DatosAD4<-filter(DatosAD3, DatosAD3$ECOPER!=8)
+DatosAD5<-filter(DatosAD4, DatosAD4$ESTUDIOS!=9)
+DatosAD6<-filter(DatosAD5, DatosAD5$ESTUDIOS!=7)
+DatosAD7<-filter(DatosAD6, DatosAD6$POB_ACTIVA_INACT!=99)
+DatosAD8<-filter(DatosAD7, DatosAD7$CLASE!=9)
+DatosAD9<-filter(DatosAD8, DatosAD8$CLASE!=8)
+D.AD.RF<-filter(DatosAD9, DatosAD9$CLASE!=6)
+```
+
+#Recodificar variables y dividir muestra train/test
+ecoper 1 muy mala, mala, regular
+2 muy buena, buena
+```{r}
+D.AD.RF$ECOPER<-car::recode(D.AD.RF$ECOPER, ' 1=2; 2=2; 3=1; 4=1; 5=1 ')
+
+D.AD.RF$CLASE<-car::recode(D.AD.RF$CLASE, ' 1=5; 2=4; 4=2; 5=1 ')
+
+D.AD.RF<-mutate_if(D.AD.RF, is.numeric, as.factor)
+str(D.AD.RF)
+```
+
+```{r}
+lapply(D.AD.RF, summary)
+```
+
+```{r}
+set.seed(639)
+train1<-sample(1:nrow(D.AD.RF), nrow(D.AD.RF) / (3/2))
+Train<-D.AD.RF[train1, ]
+Test<-D.AD.RF[-train1, ]
+```
+
+#Arbol de decision - modelo 1
+```{r}
+mod1_ad<-rpart(ECOPER ~ .,Train, method = 'class', parms = list(split = 'information'), control = rpart.control(cp = 0.000001))
+```
+
+```{r}
+printcp(mod1_ad)
+```
+
+```{r}
+plotcp(mod1_ad)
+```
+
+#Arbol de decisi??n - modelo 2
+```{r}
+mod2_ad<-rpart(ECOPER~.,Train, method = 'class', parms = list(split='information'), control = rpart.control(cp=0.01195652, maxdepth = 5))
+
+printcp(mod2_ad)
+```
+
+```{r}
+mod2_ad
+```
+
+
+```{r}
+plotcp(mod2_ad)
+```
+
+#Interpretaci??n
+```{r}
+library(rpart.plot)
+```
+
+```{r}
+rpart.plot(mod2_ad)
+```
+
+```{r}
+rpart.rules(mod2_ad,style = 'tall',cover = T)
+```
+
+#Predicci??n ??rbol de decisi??n
+```{r}
+mod2_nodo<-rpart.predict(mod2_ad, Test, nn = T)
+head(mod2_nodo)
+```
+
+```{r}
+ad_score<-predict(mod2_ad, Test, type = 'prob')[,2]
+plot(ad_score ~ Test$ECOPER)
+```
+
+#Curva ROC ??rbol de decisi??n
+```{r}
+library(ROCR)
+pred_ad<-prediction(ad_score, Test$ECOPER)
+perf_ad<-performance(pred_ad, measure = "tpr", x.measure =  "fpr")
+
+plot(perf_ad,lwd=2, colorize=T, main="ARBOL DE DECISION. CURVA ROC", type='l')
+lines(x=c(0,1), y=c(0,1), col="red", lwd=1, lty=3); 
+```
+
+#Matriz de confusion ??rbol de decisi??n
+```{r}
+test_data<-Test[complete.cases(Test),]
+ad_score_def<-predict(mod2_ad, test_data, type = "prob")
+ad_pred_def<-factor(colnames(ad_score_def)[max.col(ad_score_def)])
+confusionMatrix(ad_pred_def, test_data$ECOPER)
+```
+
+```{r}
+Accuracy_ad=0.7415*100
+Precision_ad<-(551/(551+38))*100
+Sensitivity_ad<-(551/(551+174))*100
+F1_ad<-(2*Precision_ad*Sensitivity_ad)/(Precision_ad+Sensitivity_ad)
+```
+
+#KS y AUC ??rbol de decisi??n
+```{r}
+AUC_arbol <- performance(pred_ad, measure = "auc")@y.values[[1]]*100
+KS_arbol <- max(attr(perf_ad,'y.values')[[1]]-attr(perf_ad,'x.values')[[1]])*100
+```
+
+```{r}
+cat("Acierto_Arbol: ",Accuracy_ad,"\tSensibilidad_Arbol: ", Sensitivity_ad, "\tPrecision_Arbol:", Precision_ad, "\tF1_Arbol:", F1_ad, "\tAUC_Arbol: ",AUC_arbol,"\tKS_arbol: ", KS_arbol, "\n")
+```
+
+#Modelo RANDOM FOREST
+```{r}
+library(randomForest)
+```
+
+```{r}
+mod_rf<-randomForest(ECOPER~., data=Train, na.action = na.exclude)
+mod_rf
+```
+
+```{r}
+varImpPlot(mod_rf)
+```
+
+```{r}
+(import<-importance(mod_rf))
+```
+
+```{r}
+rf_score<-predict(mod_rf, Test, type = "prob")[,2]
+```
+
+```{r}
+plot(rf_score~Test$ECOPER)
+```
+
+#curva ROC random forest
+```{r}
+pred_rf <- prediction(rf_score, Test$ECOPER)
+perf_rf <- performance(pred_rf, measure = "tpr",x.measure = "fpr")
+
+plot(perf_rf, lwd=3.5, colorize=T, main="ROC Random Forest Performance", type = 'l')
+lines(x=c(0, 1), y=c(0, 1), col="red", lwd=1, lty=1);
+```
+
+#Umbrales y matriz de confusion random forest
+```{r}
+umbral_rf <- ifelse(rf_score > 0.20, "2", "1")
+MC_rf <- table(Test$ECOPER, umbral_rf)
+Sen_rf <- MC_rf[2,2] / (MC_rf[2,2] + MC_rf[1,2]) *100
+Pr_rf <- MC_rf[2,2] / (MC_rf[2,2] + MC_rf[2,1]) *100
+F1_rf <- 2*Pr_rf*Sen_rf/(Pr_rf+Sen_rf)
+
+umbral_rf2 <- ifelse(rf_score > 0.40, "2", "1")
+MC_rf2 <- table(Test$ECOPER, umbral_rf2)
+Sen_rf2 <- MC_rf2[2,2] / (MC_rf2[2,2] + MC_rf2[1,2]) *100
+Pr_rf2 <- MC_rf2[2,2] / (MC_rf2[2,2] + MC_rf2[2,1]) *100
+F1_rf2 <- 2*Pr_rf2*Sen_rf2/(Pr_rf2+Sen_rf2)
+
+umbral_rf3 <- ifelse(rf_score > 0.60, "2", "1")
+MC_rf3 <- table(Test$ECOPER, umbral_rf3)
+Sen_rf3 <- MC_rf3[2,2] / (MC_rf3[2,2] + MC_rf3[1,2]) *100
+Pr_rf3 <- MC_rf3[2,2] / (MC_rf3[2,2] + MC_rf3[2,1]) *100
+F1_rf3 <- 2*Pr_rf3*Sen_rf3/(Pr_rf3+Sen_rf3)
+
+umbral_rf4 <- ifelse(rf_score > 0.80, "2", "1")
+MC_rf4 <- table(Test$ECOPER, umbral_rf4)
+Sen_rf4 <- MC_rf4[2,2] / (MC_rf4[2,2] + MC_rf4[1,2]) *100
+Pr_rf4 <- MC_rf4[2,2] / (MC_rf4[2,2] + MC_rf4[2,1]) *100
+F1_rf4 <- 2*Pr_rf4*Sen_rf4/(Pr_rf4+Sen_rf4)
+
+(Umbrales_rf<-c(F1_rf, F1_rf2, F1_rf3, F1_rf4))
+```
+
+```{r}
+Umbral_def_rf <- ifelse(rf_score > 0.20, "2", "1")
+MC_rf_def <- table(Test$ECOPER, Umbral_def_rf)
+rf_Acc <- round((MC_rf_def[1,1] + MC_rf_def[2,2]) / sum(MC_rf_def) *100, 2)
+rf_Sen <- round(MC_rf_def[2,2] / (MC_rf_def[2,2] + MC_rf_def[1,2]) *100, 2)
+rf_Pr <- round(MC_rf_def[2,2] / (MC_rf_def[2,2] + MC_rf_def[2,1]) *100, 2)
+rf_F1 <- round(2*rf_Pr*rf_Sen/(rf_Pr+rf_Sen), 2)
+```
+
+#KS y AUC random forest
+```{r}
+rf_KS <- round(max(attr(perf_rf,'y.values')[[1]]-attr(perf_rf,'x.values')[[1]])*100, 2)
+
+rf_AUC <- round(performance(pred_rf, measure = "auc")@y.values[[1]]*100, 2)
+```
+
+```{r}
+cat("Acierto_rf: ",rf_Acc,"\tSensibilidad_rf: ", rf_Sen, "\tPrecision_rf:", rf_Pr, "\tF1_rf:", rf_F1, "\tAUC_rf: ",rf_AUC,"\tKS_rf: ", rf_KS, "\n")
+```
+
+#COMPARACION ARBOLES DE DECISION VS RANDOM FOREST
+```{r}
+Sensitivity_ad<-round(Sensitivity_ad,3)
+Precision_ad<-round(Precision_ad,3)
+F1_ad<-round(F1_ad,3)
+AUC_arbol<-round(AUC_arbol,3)
+KS_arbol<-round(KS_arbol,3)
+modelos <- c('Arboles de decisi??n', 'Random forest')
+modelos_Acierto <- c(Accuracy_ad, rf_Acc)
+modelos_Sensibilidad <- c(Sensitivity_ad, rf_Sen)
+modelos_Precision <- c(Precision_ad, rf_Pr)
+modelos_F1 <- c(F1_ad, rf_F1)
+modelos_AUC <- c(AUC_arbol, rf_AUC)
+modelos_KS <- c(KS_arbol, rf_KS)
+```
+
+```{r}
+library(knitr)
+```
+
+```{r}
+Combinacion <- as.data.frame(cbind(modelos, modelos_Acierto, modelos_Sensibilidad, modelos_Precision, modelos_F1, modelos_AUC, modelos_KS))
+
+colnames(Combinacion) <- c("Modelo", "Accuracy", "Sensibilidad", "Precision", "F1", "AUC", "KS")
+
+kable(Combinacion, caption ="Comparacion de modelos")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
